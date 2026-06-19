@@ -18,6 +18,10 @@ export async function POST(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const crop = body?.crop;
+  const zoom = Number(body?.zoom);
+  const point = body?.point;
+  const pointX = Number(point?.x);
+  const pointY = Number(point?.y);
   const validCrop =
     crop &&
     ["x", "y", "width", "height"].every((key) => Number.isFinite(crop[key])) &&
@@ -37,12 +41,21 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   const publishedPath = await cropPublishedImage(source, id, crop);
+  const cropSettings = {
+    area: crop,
+    zoom: Number.isFinite(zoom) ? zoom : 1,
+    point: {
+      x: Number.isFinite(pointX) ? pointX : 0,
+      y: Number.isFinite(pointY) ? pointY : 0,
+    },
+    aspect: 4 / 3,
+  };
   const updated = await prisma.photo.update({
     where: { id },
     data: {
       status: "PUBLISHED",
       publishedPath,
-      crop,
+      crop: cropSettings,
     },
   });
 
@@ -52,7 +65,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       action: "PHOTO_CROP_PUBLISH",
       entity: "Photo",
       entityId: id,
-      metadata: { crop },
+      metadata: cropSettings,
     },
   });
 

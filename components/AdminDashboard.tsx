@@ -8,18 +8,18 @@ import type { Area, Point } from "react-easy-crop";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Check,
+  CheckCircle2,
   Crop,
   Download,
   Eye,
   EyeOff,
-  Heart,
   ImageIcon,
   Lock,
   LogOut,
+  Pencil,
   QrCode,
   RefreshCw,
   Settings,
-  Trash2,
   Unlock,
   X,
 } from "lucide-react";
@@ -447,46 +447,70 @@ function PhotoGrid({
               </p>
             ) : null}
 
-            <div className="grid grid-cols-3 gap-1.5">
-              <IconAction
-                label="Wybierz"
-                disabled={busyPhotoId === photo.id}
-                onClick={() => onAction(photo.id, "select")}
-              >
-                <Heart size={16} />
-              </IconAction>
-              <IconAction
-                label="Publikuj"
-                disabled={busyPhotoId === photo.id}
-                onClick={() => onAction(photo.id, "publish")}
-              >
-                <Eye size={16} />
-              </IconAction>
-              <IconAction label="Kadruj" onClick={() => onCrop(photo)}>
-                <Crop size={16} />
-              </IconAction>
-              <a
-                className="inline-flex min-h-9 items-center justify-center rounded-[8px] border border-[var(--line)] bg-white/70 text-[#3c2c22]"
-                href={`/api/admin/photos/${photo.id}/file?variant=original&download=1`}
-                title="Pobierz oryginał"
-              >
-                <Download size={16} />
-              </a>
-              <IconAction
-                label={photo.status === "PUBLISHED" ? "Cofnij" : "Ukryj"}
-                disabled={busyPhotoId === photo.id}
-                onClick={() => onAction(photo.id, photo.status === "PUBLISHED" ? "unpublish" : "hide")}
-              >
-                <EyeOff size={16} />
-              </IconAction>
-              <IconAction
-                label="Odrzuć"
-                disabled={busyPhotoId === photo.id}
-                danger
-                onClick={() => onAction(photo.id, "reject")}
-              >
-                <Trash2 size={16} />
-              </IconAction>
+            <div className="space-y-2">
+              {photo.status === "PUBLISHED" ? (
+                <div className="flex items-center gap-2 rounded-[8px] bg-[#6f8056]/12 px-3 py-2 text-sm font-black text-[#405034]">
+                  <CheckCircle2 size={17} />
+                  Widoczne w galerii
+                </div>
+              ) : (
+                <button
+                  className="btn-primary min-h-10 w-full px-3 py-2 text-sm"
+                  disabled={busyPhotoId === photo.id}
+                  onClick={() => onAction(photo.id, "publish")}
+                >
+                  <Eye size={17} />
+                  Opublikuj w galerii
+                </button>
+              )}
+
+              {photo.status === "PUBLISHED" ? (
+                <button
+                  className="btn-secondary min-h-10 w-full px-3 py-2 text-sm"
+                  disabled={busyPhotoId === photo.id}
+                  onClick={() => onAction(photo.id, "unpublish")}
+                >
+                  <EyeOff size={17} />
+                  Cofnij publikację
+                </button>
+              ) : null}
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  className="btn-secondary min-h-10 px-3 py-2 text-sm"
+                  onClick={() => onCrop(photo)}
+                >
+                  <Crop size={17} />
+                  {photo.crop ? "Popraw kadr" : "Kadruj"}
+                </button>
+                <a
+                  className="btn-secondary min-h-10 px-3 py-2 text-sm"
+                  href={`/api/admin/photos/${photo.id}/file?variant=original&download=1`}
+                >
+                  <Download size={17} />
+                  Pobierz
+                </a>
+              </div>
+
+              <label className="block">
+                <span className="mb-1 block text-xs font-black uppercase text-[#6f8056]">
+                  Status roboczy
+                </span>
+                <select
+                  className="focus-ring h-10 w-full rounded-[8px] border border-[var(--line)] bg-white px-2 text-sm font-bold text-[#3c2c22]"
+                  value={photo.status}
+                  disabled={busyPhotoId === photo.id}
+                  onChange={(event) =>
+                    onAction(photo.id, statusToAction(event.target.value as PhotoDto["status"]))
+                  }
+                >
+                  <option value="NEW">Nowe</option>
+                  <option value="SELECTED">Wybrane</option>
+                  <option value="PUBLISHED">Opublikowane</option>
+                  <option value="HIDDEN">Ukryte</option>
+                  <option value="REJECTED">Odrzucone</option>
+                </select>
+              </label>
             </div>
           </div>
         </article>
@@ -495,33 +519,12 @@ function PhotoGrid({
   );
 }
 
-function IconAction({
-  children,
-  label,
-  danger,
-  disabled,
-  onClick,
-}: {
-  children: React.ReactNode;
-  label: string;
-  danger?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className={`inline-flex min-h-9 items-center justify-center rounded-[8px] border ${
-        danger
-          ? "border-[#8d3e2f]/20 bg-[#8d3e2f]/8 text-[#7a3529]"
-          : "border-[var(--line)] bg-white/70 text-[#3c2c22]"
-      } disabled:opacity-50`}
-      onClick={onClick}
-      disabled={disabled}
-      title={label}
-    >
-      {children}
-    </button>
-  );
+function statusToAction(status: PhotoDto["status"]) {
+  if (status === "SELECTED") return "select";
+  if (status === "PUBLISHED") return "publish";
+  if (status === "HIDDEN") return "hide";
+  if (status === "REJECTED") return "reject";
+  return "new";
 }
 
 function QrCard({ title, subtitle, url }: { title: string; subtitle: string; url: string }) {
@@ -604,9 +607,9 @@ function CropModal({
   onClose: () => void;
   onSaved: (photo: PhotoDto) => void;
 }) {
-  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [area, setArea] = useState<Area | null>(null);
+  const [crop, setCrop] = useState<Point>(photo.crop?.point ?? { x: 0, y: 0 });
+  const [zoom, setZoom] = useState(photo.crop?.zoom ?? 1);
+  const [area, setArea] = useState<Area | null>(photo.crop?.area ?? null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -618,7 +621,7 @@ function CropModal({
     const response = await fetch(`/api/admin/photos/${photo.id}/crop`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ crop: area }),
+      body: JSON.stringify({ crop: area, zoom, point: crop }),
     });
 
     setSaving(false);
@@ -638,7 +641,9 @@ function CropModal({
         <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
           <div>
             <p className="text-xs font-black uppercase text-[#6f8056]">Kadrowanie</p>
-            <h2 className="font-serif text-3xl">Wersja do galerii</h2>
+            <h2 className="font-serif text-3xl">
+              {photo.crop ? "Popraw kadr" : "Wersja do galerii"}
+            </h2>
           </div>
           <button className="btn-secondary" onClick={onClose}>
             <X size={17} />
@@ -654,6 +659,7 @@ function CropModal({
             crop={crop}
             zoom={zoom}
             aspect={4 / 3}
+            initialCroppedAreaPixels={photo.crop?.area}
             onCropChange={setCrop}
             onZoomChange={setZoom}
             onCropComplete={(_, croppedAreaPixels) => setArea(croppedAreaPixels)}
@@ -676,8 +682,8 @@ function CropModal({
           <div className="flex flex-wrap gap-2">
             {error ? <p className="self-center text-sm font-bold text-[#8d3e2f]">{error}</p> : null}
             <button className="btn-primary" onClick={save} disabled={saving}>
-              <Check size={17} />
-              {saving ? "Zapisywanie..." : "Zapisz i publikuj"}
+              {photo.crop ? <Pencil size={17} /> : <Check size={17} />}
+              {saving ? "Zapisywanie..." : photo.crop ? "Zapisz korektę" : "Zapisz i publikuj"}
             </button>
           </div>
         </div>

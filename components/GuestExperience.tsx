@@ -2,8 +2,10 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   Heart,
   ImagePlus,
@@ -12,6 +14,7 @@ import {
   Plus,
   Send,
   Trash2,
+  X,
   XCircle,
 } from "lucide-react";
 import type { EventDto, PhotoDto } from "@/lib/photo-dto";
@@ -38,6 +41,7 @@ export default function GuestExperience({ event, photos, token }: Props) {
   const [selectedPhotos, setSelectedPhotos] = useState<SelectedPhoto[]>([]);
   const [uploading, setUploading] = useState(false);
   const [selectionError, setSelectionError] = useState("");
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedPhotosRef = useRef<SelectedPhoto[]>([]);
   const galleryUrl = `/api/gallery/${token}/photos/`;
@@ -55,6 +59,8 @@ export default function GuestExperience({ event, photos, token }: Props) {
     () => selectedPhotos.filter((photo) => photo.status !== "done").length,
     [selectedPhotos],
   );
+  const selectedGalleryPhoto =
+    galleryIndex === null || !photos[galleryIndex] ? null : photos[galleryIndex];
 
   useEffect(() => {
     selectedPhotosRef.current = selectedPhotos;
@@ -65,6 +71,35 @@ export default function GuestExperience({ event, photos, token }: Props) {
       selectedPhotosRef.current.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
     };
   }, []);
+
+  const showPreviousPhoto = useCallback(() => {
+    if (!photos.length) return;
+    setGalleryIndex((current) => {
+      const index = current ?? 0;
+      return index === 0 ? photos.length - 1 : index - 1;
+    });
+  }, [photos.length]);
+
+  const showNextPhoto = useCallback(() => {
+    if (!photos.length) return;
+    setGalleryIndex((current) => {
+      const index = current ?? 0;
+      return index === photos.length - 1 ? 0 : index + 1;
+    });
+  }, [photos.length]);
+
+  useEffect(() => {
+    if (galleryIndex === null) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setGalleryIndex(null);
+      if (event.key === "ArrowLeft") showPreviousPhoto();
+      if (event.key === "ArrowRight") showNextPhoto();
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [galleryIndex, showNextPhoto, showPreviousPhoto]);
 
   function openFilePicker() {
     if (!uploading) fileInputRef.current?.click();
@@ -396,12 +431,11 @@ export default function GuestExperience({ event, photos, token }: Props) {
 
           {event.galleryEnabled && photos.length ? (
             <div className="guest-gallery-grid">
-              {photos.map((photo) => (
-                <a
+              {photos.map((photo, index) => (
+                <button
                   key={photo.id}
-                  href={`${galleryUrl}${photo.id}`}
-                  target="_blank"
-                  className="mb-3 block overflow-hidden rounded-[8px] border border-[var(--line)] bg-white shadow-sm"
+                  className="mb-3 block w-full overflow-hidden rounded-[8px] border border-[var(--line)] bg-white text-left shadow-sm transition hover:brightness-95"
+                  onClick={() => setGalleryIndex(index)}
                 >
                   <img
                     src={`${galleryUrl}${photo.id}`}
@@ -409,7 +443,7 @@ export default function GuestExperience({ event, photos, token }: Props) {
                     className="h-auto w-full"
                     loading="lazy"
                   />
-                </a>
+                </button>
               ))}
             </div>
           ) : (
@@ -423,6 +457,47 @@ export default function GuestExperience({ event, photos, token }: Props) {
           )}
         </div>
       </section>
+
+      {selectedGalleryPhoto ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1b130f]/92 p-3">
+          <button
+            className="absolute right-3 top-3 z-10 grid h-12 w-12 place-items-center rounded-[8px] bg-white/12 text-white backdrop-blur transition hover:bg-white/22"
+            onClick={() => setGalleryIndex(null)}
+            aria-label="Zamknij podgląd"
+          >
+            <X size={28} />
+          </button>
+
+          {photos.length > 1 ? (
+            <>
+              <button
+                className="absolute left-3 top-1/2 z-10 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-[8px] bg-white/12 text-white backdrop-blur transition hover:bg-white/22"
+                onClick={showPreviousPhoto}
+                aria-label="Poprzednie zdjęcie"
+              >
+                <ChevronLeft size={32} />
+              </button>
+              <button
+                className="absolute right-3 top-1/2 z-10 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-[8px] bg-white/12 text-white backdrop-blur transition hover:bg-white/22"
+                onClick={showNextPhoto}
+                aria-label="Następne zdjęcie"
+              >
+                <ChevronRight size={32} />
+              </button>
+            </>
+          ) : null}
+
+          <img
+            src={`${galleryUrl}${selectedGalleryPhoto.id}`}
+            alt="Zdjęcie z galerii weselnej"
+            className="max-h-[86vh] max-w-full rounded-[8px] object-contain shadow-2xl"
+          />
+
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-white/12 px-4 py-2 text-sm font-bold text-white backdrop-blur">
+            {(galleryIndex ?? 0) + 1} / {photos.length}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
