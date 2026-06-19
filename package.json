@@ -18,11 +18,6 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
-    "@uppy/core": "^5.2.0",
-    "@uppy/dashboard": "^5.1.1",
-    "@uppy/locales": "^5.1.1",
-    "@uppy/react": "^5.2.0",
-    "@uppy/xhr-upload": "^5.2.0",
     "archiver": "^8.0.0",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",

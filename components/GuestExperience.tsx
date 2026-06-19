@@ -2,12 +2,18 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useMemo, useState } from "react";
-import Uppy from "@uppy/core";
-import Dashboard from "@uppy/react/dashboard";
-import XHRUpload from "@uppy/xhr-upload";
-import Polish from "@uppy/locales/lib/pl_PL";
-import { CheckCircle2, Heart, Lock } from "lucide-react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CheckCircle2,
+  Heart,
+  ImagePlus,
+  Loader2,
+  Lock,
+  Plus,
+  Send,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import type { EventDto, PhotoDto } from "@/lib/photo-dto";
 
 type Props = {
@@ -16,70 +22,180 @@ type Props = {
   token: string;
 };
 
-const guestUploadLocale = {
-  ...Polish,
-  strings: {
-    ...Polish.strings,
-    browse: "Wybierz zdjęcia",
-    browseFiles: "Wybierz zdjęcia z telefonu",
-    dropHint: "Dodaj zdjęcia z telefonu",
-    dropPasteFiles: "%{browse}",
-    dropPasteBoth: "%{browse}",
-    uploadXFiles: {
-      "0": "Wyślij %{smart_count} zdjęcie",
-      "1": "Wyślij %{smart_count} zdjęć",
-    },
-    uploadXNewFiles: {
-      "0": "Wyślij +%{smart_count} zdjęcie",
-      "1": "Wyślij +%{smart_count} zdjęć",
-    },
-    xFilesSelected: {
-      "0": "%{smart_count} zdjęcie wybrane",
-      "1": "%{smart_count} zdjęć wybranych",
-    },
-  },
+type SelectedPhoto = {
+  id: string;
+  file: File;
+  previewUrl: string;
+  status: "queued" | "uploading" | "done" | "error";
+  progress: number;
+  error?: string;
 };
+
+const maxFileSize = 40 * 1024 * 1024;
 
 export default function GuestExperience({ event, photos, token }: Props) {
   const [guestName, setGuestName] = useState("");
-  const [completedCount, setCompletedCount] = useState(0);
+  const [selectedPhotos, setSelectedPhotos] = useState<SelectedPhoto[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [selectionError, setSelectionError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectedPhotosRef = useRef<SelectedPhoto[]>([]);
   const galleryUrl = `/api/gallery/${token}/photos/`;
 
-  const uppy = useMemo(() => {
-    return new Uppy({
-      locale: guestUploadLocale,
-      restrictions: {
-        maxFileSize: 40 * 1024 * 1024,
-        maxNumberOfFiles: 80,
-        allowedFileTypes: ["image/*", ".heic", ".heif"],
-      },
-      autoProceed: false,
-    }).use(XHRUpload, {
-      endpoint: `/api/upload/${event.uploadToken}`,
-      fieldName: "file",
-      formData: true,
-      allowedMetaFields: ["guestName"],
-      limit: 2,
-      getResponseData: (xhr) => JSON.parse(xhr.responseText) as Record<string, unknown>,
-    });
-  }, [event.uploadToken]);
+  const uploadableCount = useMemo(
+    () => selectedPhotos.filter((photo) => photo.status === "queued" || photo.status === "error")
+      .length,
+    [selectedPhotos],
+  );
+  const completedCount = useMemo(
+    () => selectedPhotos.filter((photo) => photo.status === "done").length,
+    [selectedPhotos],
+  );
+  const activeCount = useMemo(
+    () => selectedPhotos.filter((photo) => photo.status !== "done").length,
+    [selectedPhotos],
+  );
 
   useEffect(() => {
-    uppy.setMeta({ guestName: guestName.trim() });
-  }, [guestName, uppy]);
+    selectedPhotosRef.current = selectedPhotos;
+  }, [selectedPhotos]);
 
   useEffect(() => {
-    const onComplete = () => {
-      const successful = uppy.getFiles().filter((file) => file.progress.uploadComplete);
-      setCompletedCount(successful.length);
-    };
-
-    uppy.on("complete", onComplete);
     return () => {
-      uppy.off("complete", onComplete);
-      uppy.destroy();
+      selectedPhotosRef.current.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
     };
-  }, [uppy]);
+  }, []);
+
+  function openFilePicker() {
+    if (!uploading) fileInputRef.current?.click();
+  }
+
+  function onFilesSelected(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (!files.length) return;
+
+    const accepted: SelectedPhoto[] = [];
+    const rejected: string[] = [];
+
+    for (const file of files) {
+      if (!isImageFile(file)) {
+        rejected.push(`${file.name}: to nie wygląda jak zdjęcie`);
+        continue;
+      }
+
+      if (file.size > maxFileSize) {
+        rejected.push(`${file.name}: maksymalnie 40 MB`);
+        continue;
+      }
+
+      accepted.push({
+        id: createClientId(),
+        file,
+        previewUrl: URL.createObjectURL(file),
+        status: "queued",
+        progress: 0,
+      });
+    }
+
+    setSelectionError(rejected.slice(0, 3).join(". "));
+    if (accepted.length) {
+      setSelectedPhotos((current) => [...current, ...accepted]);
+    }
+  }
+
+  function removePhoto(id: string) {
+    setSelectedPhotos((current) => {
+      const removed = current.find((photo) => photo.id === id);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return current.filter((photo) => photo.id !== id);
+    });
+  }
+
+  async function uploadSelectedPhotos() {
+    if (uploading || uploadableCount === 0) return;
+    setUploading(true);
+
+    const idsToUpload = selectedPhotosRef.current
+      .filter((photo) => photo.status === "queued" || photo.status === "error")
+      .map((photo) => photo.id);
+
+    for (const id of idsToUpload) {
+      const photo = selectedPhotosRef.current.find((item) => item.id === id);
+      if (!photo) continue;
+      await uploadPhoto(photo);
+    }
+
+    setUploading(false);
+  }
+
+  function uploadPhoto(photo: SelectedPhoto) {
+    return new Promise<void>((resolve) => {
+      setSelectedPhotos((current) =>
+        current.map((item) =>
+          item.id === photo.id
+            ? { ...item, status: "uploading", progress: Math.max(item.progress, 4), error: undefined }
+            : item,
+        ),
+      );
+
+      const formData = new FormData();
+      formData.append("file", photo.file);
+      if (guestName.trim()) formData.append("guestName", guestName.trim());
+
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `/api/upload/${event.uploadToken}`);
+
+      xhr.upload.onprogress = (progressEvent) => {
+        if (!progressEvent.lengthComputable) return;
+        const progress = Math.max(
+          5,
+          Math.min(95, Math.round((progressEvent.loaded / progressEvent.total) * 100)),
+        );
+        setSelectedPhotos((current) =>
+          current.map((item) => (item.id === photo.id ? { ...item, progress } : item)),
+        );
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          setSelectedPhotos((current) =>
+            current.map((item) =>
+              item.id === photo.id ? { ...item, status: "done", progress: 100 } : item,
+            ),
+          );
+          resolve();
+          return;
+        }
+
+        const message = parseUploadError(xhr.responseText);
+        setSelectedPhotos((current) =>
+          current.map((item) =>
+            item.id === photo.id ? { ...item, status: "error", progress: 0, error: message } : item,
+          ),
+        );
+        resolve();
+      };
+
+      xhr.onerror = () => {
+        setSelectedPhotos((current) =>
+          current.map((item) =>
+            item.id === photo.id
+              ? {
+                  ...item,
+                  status: "error",
+                  progress: 0,
+                  error: "Nie udało się wysłać. Spróbuj ponownie.",
+                }
+              : item,
+          ),
+        );
+        resolve();
+      };
+
+      xhr.send(formData);
+    });
+  }
 
   return (
     <main className="boho-bg min-h-screen">
@@ -130,18 +246,123 @@ export default function GuestExperience({ event, photos, token }: Props) {
                 />
               </label>
 
-              <Dashboard
-                uppy={uppy}
-                width="100%"
-                height={280}
-                proudlyDisplayPoweredByUppy={false}
-                note="Możesz wybrać kilka zdjęć naraz."
+              <input
+                ref={fileInputRef}
+                className="sr-only"
+                type="file"
+                accept="image/*,.heic,.heif"
+                multiple
+                onChange={onFilesSelected}
               />
+
+              <div className="rounded-[8px] border border-[var(--line)] bg-white/72 p-3">
+                {selectedPhotos.length === 0 ? (
+                  <button
+                    type="button"
+                    className="focus-ring flex min-h-40 w-full flex-col items-center justify-center rounded-[8px] border border-dashed border-[#6f8056]/45 bg-[#6f8056]/8 px-4 py-6 text-center transition hover:bg-[#6f8056]/12"
+                    onClick={openFilePicker}
+                  >
+                    <span className="mb-4 grid h-12 w-12 place-items-center rounded-full bg-[#4e5d3e] text-white shadow-sm">
+                      <ImagePlus size={24} />
+                    </span>
+                    <span className="text-lg font-black text-[#3c2c22]">
+                      Wybierz zdjęcia z telefonu
+                    </span>
+                    <span className="mt-2 text-sm font-semibold text-[var(--muted)]">
+                      Możesz wybrać kilka zdjęć naraz.
+                    </span>
+                  </button>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded-[8px] bg-[#f7f1e7] p-3">
+                      <p className="text-sm font-black text-[#3c2c22]">
+                        {uploadableCount > 0
+                          ? `${uploadableCount} ${photoWord(uploadableCount)} gotowe do wysłania`
+                          : "Wszystkie wybrane zdjęcia są wysłane"}
+                      </p>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+                        <button
+                          type="button"
+                          className="btn-primary w-full"
+                          disabled={uploading || uploadableCount === 0}
+                          onClick={uploadSelectedPhotos}
+                        >
+                          {uploading ? (
+                            <Loader2 className="animate-spin" size={18} />
+                          ) : (
+                            <Send size={18} />
+                          )}
+                          {uploading
+                            ? "Wysyłanie..."
+                            : uploadableCount > 0
+                              ? `Wyślij ${uploadableCount} ${photoWord(uploadableCount)}`
+                              : "Zdjęcia wysłane"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary w-full sm:w-auto"
+                          disabled={uploading}
+                          onClick={openFilePicker}
+                        >
+                          <Plus size={18} />
+                          Dodaj kolejne
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid max-h-80 gap-2 overflow-y-auto pr-1">
+                      {selectedPhotos.map((photo) => (
+                        <div
+                          key={photo.id}
+                          className="grid grid-cols-[64px_1fr_auto] items-center gap-3 rounded-[8px] border border-[var(--line)] bg-white p-2"
+                        >
+                          <img
+                            src={photo.previewUrl}
+                            alt=""
+                            className="h-16 w-16 rounded-[6px] object-cover"
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-[#3c2c22]">
+                              {photo.file.name}
+                            </p>
+                            <p className="mt-0.5 text-xs font-semibold text-[var(--muted)]">
+                              {formatBytes(photo.file.size)}
+                            </p>
+                            <PhotoProgress photo={photo} />
+                          </div>
+                          {photo.status === "done" ? (
+                            <CheckCircle2 className="text-[#4e5d3e]" size={22} />
+                          ) : (
+                            <button
+                              type="button"
+                              className="grid h-9 w-9 place-items-center rounded-[8px] border border-[var(--line)] bg-white text-[#6b4f3c]"
+                              disabled={photo.status === "uploading"}
+                              onClick={() => removePhoto(photo.id)}
+                              title="Usuń zdjęcie"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {selectionError ? (
+                <div className="mt-3 flex items-start gap-2 rounded-[8px] border border-[#8d3e2f]/20 bg-[#8d3e2f]/10 px-3 py-2 text-sm font-bold text-[#7a3529]">
+                  <XCircle className="mt-0.5 shrink-0" size={18} />
+                  {selectionError}
+                </div>
+              ) : null}
 
               {completedCount > 0 ? (
                 <div className="mt-4 flex items-center gap-3 rounded-[8px] border border-[#6f8056]/20 bg-[#6f8056]/10 px-3 py-3 text-sm font-bold text-[#415033]">
                   <CheckCircle2 size={20} />
-                  Zdjęcia dotarły. Dziękujemy!
+                  {activeCount > 0
+                    ? `${completedCount} ${photoWord(completedCount)} już dotarło.`
+                    : "Zdjęcia dotarły. Dziękujemy!"}
                 </div>
               ) : null}
             </>
@@ -204,4 +425,65 @@ export default function GuestExperience({ event, photos, token }: Props) {
       </section>
     </main>
   );
+}
+
+function PhotoProgress({ photo }: { photo: SelectedPhoto }) {
+  if (photo.status === "queued") {
+    return <p className="mt-1 text-xs font-bold text-[#6f8056]">Gotowe do wysłania</p>;
+  }
+
+  if (photo.status === "done") {
+    return <p className="mt-1 text-xs font-bold text-[#4e5d3e]">Wysłane</p>;
+  }
+
+  if (photo.status === "error") {
+    return (
+      <p className="mt-1 line-clamp-2 text-xs font-bold text-[#8d3e2f]">
+        {photo.error ?? "Nie udało się wysłać."}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-2">
+      <div className="h-2 overflow-hidden rounded-full bg-[#efe4d2]">
+        <div
+          className="h-full rounded-full bg-[#4e5d3e]"
+          style={{ width: `${photo.progress}%` }}
+        />
+      </div>
+      <p className="mt-1 text-xs font-bold text-[#4e5d3e]">Wysyłanie {photo.progress}%</p>
+    </div>
+  );
+}
+
+function createClientId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function isImageFile(file: File) {
+  return file.type.startsWith("image/") || /\.(avif|heic|heif|jpe?g|png|webp)$/i.test(file.name);
+}
+
+function parseUploadError(responseText: string) {
+  try {
+    const parsed = JSON.parse(responseText) as { error?: string };
+    return parsed.error ?? "Nie udało się wysłać. Spróbuj ponownie.";
+  } catch {
+    return "Nie udało się wysłać. Spróbuj ponownie.";
+  }
+}
+
+function photoWord(count: number) {
+  if (count === 1) return "zdjęcie";
+  if (count >= 2 && count <= 4) return "zdjęcia";
+  return "zdjęć";
 }
