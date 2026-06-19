@@ -1,0 +1,8 @@
+{$CADDY_SITE_ADDRESS} {
+  request_body {
+    max_size 100MB
+  }
+
+  encode zstd gzip
+  reverse_proxy app:3000
+}

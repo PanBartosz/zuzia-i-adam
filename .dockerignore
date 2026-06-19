@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+.env
+data
+output
+.playwright-cli
+generated/prisma
+npm-debug.log*

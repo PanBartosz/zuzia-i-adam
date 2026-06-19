@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Zuzia & Adam - aplikacja zdjęć weselnych
 
-## Getting Started
+Responsywna aplikacja do zbierania zdjęć od gości i publikowania wybranej galerii po weselu.
 
-First, run the development server:
+## Funkcje
+
+- publiczny upload zdjęć pod ukrytym tokenem QR,
+- lokalny storage oryginałów, miniatur i wersji publikowanych,
+- panel admina z blokadą uploadu i galerii,
+- wybieranie, publikowanie, ukrywanie i odrzucanie zdjęć,
+- kadrowanie wersji publikowanej,
+- eksport oryginałów jako ZIP,
+- generator QR dla uploadu i galerii.
+
+## Lokalny start
 
 ```bash
+cp .env.example .env
+docker compose up -d db
+npm install
+npm run db:migrate
+npm run db:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Adresy po seedzie:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- gość: `http://localhost:3000/u/zuzia-adam-2026-wrzucamy`
+- admin: `http://localhost:3000/admin`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Domyślne konto dev:
 
-## Learn More
+- e-mail: `admin@zuziaiadam.pl`
+- hasło: `zmien-to-przed-weselem`
 
-To learn more about Next.js, take a look at the following resources:
+Przed publicznym użyciem zmień `AUTH_SECRET`, `ADMIN_PASSWORD`, tokeny i `APP_BASE_URL` w `.env`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Docker
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+docker compose up --build
+```
 
-## Deploy on Vercel
+W compose aplikacja zapisuje pliki w `./data`, a Postgres działa w osobnym wolumenie. Na hoście baza jest wystawiona na `localhost:55432`, żeby nie kolidować z lokalnym Postgresem na `5432`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Testowy serwer
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Na serwerze testowym użyj obrazu z GHCR i osobnego compose:
+
+```bash
+cp .env.server.example .env.server
+docker compose --env-file .env.server -f docker-compose.server.yml up -d
+```
+
+Zdjęcia będą zapisywane w `./data`, a baza w wolumenie `postgres-data`.
+Jeśli ustawisz `CADDY_SITE_ADDRESS` na domenę, Caddy spróbuje automatycznie wystawić HTTPS. Wtedy `APP_BASE_URL` powinien wskazywać adres `https://...`.
+
+## GHCR
+
+Workflow w `.github/workflows/ghcr.yml` buduje obraz po każdym pushu i publikuje go do:
+
+```text
+ghcr.io/panbartosz/zuzia-i-adam
+```
+
+Tag `latest` jest publikowany dla domyślnej gałęzi, a dodatkowo powstają tagi branch/sha.
+
+## Struktura storage
+
+```text
+data/
+  originals/   # prywatne oryginały
+  thumbs/      # miniatury admina
+  web/         # wersje robocze web
+  published/   # wersje publicznej galerii
+```
+
+Zdjęcia nie są wkładane do `public/`; serwują je kontrolowane endpointy API.
+
+## Weryfikacja
+
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```

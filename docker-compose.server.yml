@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-wedding}
+      POSTGRES_USER: ${POSTGRES_USER:-wedding}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.server}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wedding} -d ${POSTGRES_DB:-wedding}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    image: ${APP_IMAGE:-ghcr.io/panbartosz/zuzia-i-adam:latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-wedding}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.server}@db:5432/${POSTGRES_DB:-wedding}?schema=public
+      STORAGE_ROOT: /app/data
+      APP_BASE_URL: ${APP_BASE_URL:?Set APP_BASE_URL in .env.server}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env.server}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env.server}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env.server}
+      COUPLE_NAME: ${COUPLE_NAME:-Zuzia & Adam}
+      WEDDING_DATE: ${WEDDING_DATE:-}
+      UPLOAD_TOKEN: ${UPLOAD_TOKEN:?Set UPLOAD_TOKEN in .env.server}
+      GALLERY_TOKEN: ${GALLERY_TOKEN:?Set GALLERY_TOKEN in .env.server}
+    volumes:
+      - ./data:/app/data
+    expose:
+      - "3000"
+    command: sh -c "npm run db:deploy && npm run db:seed && npm run start"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      CADDY_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:-:80}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./Caddyfile.server:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
