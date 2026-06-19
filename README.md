@@ -48,12 +48,27 @@ W compose aplikacja zapisuje pliki w `./data`, a Postgres działa w osobnym wolu
 Na serwerze testowym użyj obrazu z GHCR i osobnego compose:
 
 ```bash
+docker compose -f docker-compose.test.yml up -d
+```
+
+Ten plik ma wpisane testowe wartości na sztywno i nie wymaga `.env` ani osobnego `Caddyfile`.
+Wystawia aplikację na porcie `55321`, więc w Nginx Proxy Manager ustaw:
+
+```text
+Forward Hostname / IP: IP_SERWERA
+Forward Port: 55321
+Scheme: http
+```
+
+Wariant konfigurowalny przez `.env.server`:
+
+```bash
 cp .env.server.example .env.server
 docker compose --env-file .env.server -f docker-compose.server.yml up -d
 ```
 
 Zdjęcia będą zapisywane w `./data`, a baza w wolumenie `postgres-data`.
-Jeśli ustawisz `CADDY_SITE_ADDRESS` na domenę, Caddy spróbuje automatycznie wystawić HTTPS. Wtedy `APP_BASE_URL` powinien wskazywać adres `https://...`.
+Wariant konfigurowalny też wystawia aplikację bezpośrednio na `APP_PORT`; reverse proxy/TLS robi Nginx Proxy Manager.
 
 ## GHCR
 

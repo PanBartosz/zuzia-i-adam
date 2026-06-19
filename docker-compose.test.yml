@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wedding
+      POSTGRES_USER: wedding
+      POSTGRES_PASSWORD: zuziaiadam
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wedding -d wedding"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    image: ghcr.io/panbartosz/zuzia-i-adam:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://wedding:zuziaiadam@db:5432/wedding?schema=public
+      STORAGE_ROOT: /app/data
+      APP_BASE_URL: https://zuziaiadam.bartoszmackiewicz.pl
+      AUTH_SECRET: wedding2026-test-secret
+      ADMIN_EMAIL: b.mackiewicz@uw.edu.pl
+      ADMIN_PASSWORD: wedding2026
+      COUPLE_NAME: Zuzia & Adam
+      WEDDING_DATE: ""
+      UPLOAD_TOKEN: wyslij-zdjecia
+      GALLERY_TOKEN: zobacz-zdjecia
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "55321:3000"
+    command: sh -c "npm run db:deploy && npm run db:seed && npm run start"
+
+volumes:
+  postgres-data:
