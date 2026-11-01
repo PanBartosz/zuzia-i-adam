@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import GuestExperience from "@/components/GuestExperience";
-import { prisma } from "@/lib/prisma";
-import { toEventDto, toPhotoDto } from "@/lib/photo-dto";
+import { toEventDto } from "@/lib/photo-dto";
+import { findGuestEvent, getGalleryPage } from "@/lib/gallery";
 
 export const dynamic = "force-dynamic";
 
@@ -11,29 +11,18 @@ type Props = {
 
 export default async function GuestPage({ params }: Props) {
   const { token } = await params;
-  const event = await prisma.event.findFirst({
-    where: {
-      OR: [{ uploadToken: token }, { galleryToken: token }],
-    },
-  });
+  const event = await findGuestEvent(token);
 
   if (!event) notFound();
 
-  const photos = event.galleryEnabled
-    ? await prisma.photo.findMany({
-        where: {
-          eventId: event.id,
-          status: "PUBLISHED",
-        },
-        orderBy: { updatedAt: "desc" },
-        take: 300,
-      })
-    : [];
+  const gallery = event.galleryEnabled
+    ? await getGalleryPage(event.id)
+    : { photos: [], nextCursor: null, total: 0 };
 
   return (
     <GuestExperience
       event={toEventDto(event)}
-      photos={photos.map(toPhotoDto)}
+      gallery={gallery}
       token={token}
     />
   );

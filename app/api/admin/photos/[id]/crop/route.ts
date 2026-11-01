@@ -25,6 +25,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   const validCrop =
     crop &&
     ["x", "y", "width", "height"].every((key) => Number.isFinite(crop[key])) &&
+    crop.x >= 0 &&
+    crop.y >= 0 &&
     crop.width > 0 &&
     crop.height > 0;
 
@@ -40,10 +42,17 @@ export async function POST(request: NextRequest, { params }: Params) {
     return jsonError("Nie znaleziono pliku źródłowego.", 404);
   }
 
-  const publishedPath = await cropPublishedImage(source, id, crop);
+  const publishedPath = await cropPublishedImage(source, id, crop).catch(
+    () => null,
+  );
+  if (!publishedPath)
+    return jsonError(
+      "Kadr wykracza poza zdjęcie lub plik jest nieprawidłowy.",
+      400,
+    );
   const cropSettings = {
     area: crop,
-    zoom: Number.isFinite(zoom) ? zoom : 1,
+    zoom: Number.isFinite(zoom) ? Math.min(3, Math.max(1, zoom)) : 1,
     point: {
       x: Number.isFinite(pointX) ? pointX : 0,
       y: Number.isFinite(pointY) ? pointY : 0,
@@ -53,7 +62,6 @@ export async function POST(request: NextRequest, { params }: Params) {
   const updated = await prisma.photo.update({
     where: { id },
     data: {
-      status: "PUBLISHED",
       publishedPath,
       crop: cropSettings,
     },
@@ -62,7 +70,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   await prisma.auditLog.create({
     data: {
       userId: auth.session?.id,
-      action: "PHOTO_CROP_PUBLISH",
+      action: "PHOTO_CROP_SAVE",
       entity: "Photo",
       entityId: id,
       metadata: cropSettings,

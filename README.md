@@ -12,6 +12,24 @@ Responsywna aplikacja do zbierania zdjęć od gości i publikowania wybranej gal
 - eksport oryginałów jako ZIP,
 - generator QR dla uploadu i galerii.
 
+## Widok gości
+
+Strona ma jasny wygląd z delikatnymi zielonymi akcentami, nagłówek „Zuzanna & Adam”
+i osobistą wiadomość od pary. Link do galerii otwiera od razu zakładkę galerii.
+Przełączenie zakładek nie usuwa zdjęć wybranych do wysłania.
+
+Formularz obsługuje dodawanie kolejnych plików, pomijanie powtórnego wyboru tego
+samego pliku, postęp, zatrzymanie kolejki po bieżącym zdjęciu i ponawianie błędów.
+Podgląd galerii ma strzałki, gest przesunięcia, Escape, zarządzanie fokusem oraz
+pobieranie pojedynczego zdjęcia w JPG. Całą galerię lub zaznaczone zdjęcia można
+pobrać jako ZIP z JPG. Goście otrzymują wyłącznie opublikowane, wykadrowane wersje.
+
+Panel administracyjny pozwala zaznaczać oryginały do ZIP i przeglądać zdjęcia
+bez otwierania kadrowania. Zapis kadru zachowuje dotychczasowy status publikacji;
+publikacja jest osobną decyzją, a cofnięcie i ponowienie publikacji zachowuje kadr.
+Galeria gości pobiera kolejne strony po 48 zdjęć. Panel admina renderuje po 48
+miniatur, a eksport obejmuje także zdjęcia jeszcze niewyświetlone.
+
 ## Lokalny start
 
 ```bash
@@ -99,3 +117,16 @@ npm run lint
 npx tsc --noEmit
 npm run build
 ```
+
+Testy przeglądarkowe uruchamiaj na lokalnej bazie po migracji i seedzie:
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+Wymagają działającego PostgreSQL, konfiguracji `.env` oraz programu `unzip`.
+Playwright uruchamia serwer na `localhost:3000` lub wykorzystuje już działający.
+Testy tworzą własne zdjęcia, tymczasowo otwierają dodawanie i galerię,
+a na końcu usuwają swoje zdjęcia i przywracają poprzednie ustawienia.
+Zrzuty ekranów i pobrane próbki trafiają do ignorowanego `output/playwright/`.

@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
   const photos = await prisma.photo.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    take: 500,
   });
 
   return NextResponse.json({ photos: photos.map(toPhotoDto) });

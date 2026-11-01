@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { coupleName } from "@/lib/wedding";
 
 export const metadata: Metadata = {
-  title: "Zuzia & Adam | Zdjęcia z wesela",
+  title: `${coupleName} | Zdjęcia z wesela`,
   description: "Prywatna aplikacja do zbierania i oglądania zdjęć z wesela.",
 };
 
@@ -13,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pl" className="h-full antialiased">
-      <body className="min-h-full bg-[#f7f1e7] text-[#3c2c22]">{children}</body>
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }

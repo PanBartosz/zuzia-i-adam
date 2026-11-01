@@ -19,7 +19,6 @@ export default async function AdminPage() {
   const photos = await prisma.photo.findMany({
     where: { eventId: event.id },
     orderBy: { createdAt: "desc" },
-    take: 500,
   });
 
   return (

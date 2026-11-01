@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { PhotoStatus } from "@/generated/prisma/enums";
-import { createPublishedImage } from "@/lib/image-processing";
+import {
+  createPublishedImage,
+  cropPublishedImage,
+} from "@/lib/image-processing";
 import { jsonError, requireAdminRequest } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { storageFileExists } from "@/lib/storage";
@@ -34,7 +37,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return jsonError("Nie znaleziono pliku źródłowego.", 404);
     }
 
-    const publishedPath = await createPublishedImage(source, photo.id);
+    const savedCrop = toPhotoDto(photo).crop;
+    const publishedPath =
+      photo.publishedPath && (await storageFileExists(photo.publishedPath))
+        ? photo.publishedPath
+        : savedCrop
+          ? await cropPublishedImage(source, photo.id, savedCrop.area)
+          : await createPublishedImage(source, photo.id);
     data = { status: "PUBLISHED", publishedPath };
   } else if (action === "select") {
     data = { status: "SELECTED" };
