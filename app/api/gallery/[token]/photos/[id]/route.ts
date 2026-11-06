@@ -3,6 +3,7 @@ import { jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { readStorageFile } from "@/lib/storage";
 import sharp from "sharp";
+import { findGuestEvent } from "@/lib/guest-access";
 
 export const runtime = "nodejs";
 
@@ -12,11 +13,7 @@ type Params = {
 
 export async function GET(request: NextRequest, { params }: Params) {
   const { token, id } = await params;
-  const event = await prisma.event.findFirst({
-    where: {
-      OR: [{ uploadToken: token }, { galleryToken: token }],
-    },
-  });
+  const event = await findGuestEvent(token);
 
   if (!event || !event.galleryEnabled) {
     return jsonError("Galeria nie jest jeszcze dostępna.", 403);

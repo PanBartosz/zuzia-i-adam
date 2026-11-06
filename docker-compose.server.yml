@@ -29,8 +29,8 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env.server}
       COUPLE_NAME: ${COUPLE_NAME:-Zuzia & Adam}
       WEDDING_DATE: ${WEDDING_DATE:-}
-      UPLOAD_TOKEN: ${UPLOAD_TOKEN:?Set UPLOAD_TOKEN in .env.server}
-      GALLERY_TOKEN: ${GALLERY_TOKEN:?Set GALLERY_TOKEN in .env.server}
+      UPLOAD_TOKEN: ${UPLOAD_TOKEN:-}
+      GALLERY_TOKEN: ${GALLERY_TOKEN:-}
     volumes:
       - ./data:/app/data
     ports:

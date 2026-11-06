@@ -4,13 +4,13 @@ Responsywna aplikacja do zbierania zdjęć od gości i publikowania wybranej gal
 
 ## Funkcje
 
-- publiczny upload zdjęć pod ukrytym tokenem QR,
+- prywatny album dostępny przez kod/hasło lub link QR,
 - lokalny storage oryginałów, miniatur i wersji publikowanych,
 - panel admina z blokadą uploadu i galerii,
 - wybieranie, publikowanie, ukrywanie i odrzucanie zdjęć,
 - kadrowanie wersji publikowanej,
 - eksport oryginałów jako ZIP,
-- generator QR dla uploadu i galerii.
+- generator QR i unieważnianie kodów dostępu w panelu admina.
 
 ## Widok gości
 
@@ -43,7 +43,7 @@ npm run dev
 
 Adresy po seedzie:
 
-- gość: `http://localhost:3000/u/zuzia-adam-2026-wrzucamy`
+- gość: `http://localhost:3000` — formularz kodu dostępu,
 - admin: `http://localhost:3000/admin`
 
 Domyślne konto dev:
@@ -51,7 +51,25 @@ Domyślne konto dev:
 - e-mail: `admin@zuziaiadam.pl`
 - hasło: `zmien-to-przed-weselem`
 
-Przed publicznym użyciem zmień `AUTH_SECRET`, `ADMIN_PASSWORD`, tokeny i `APP_BASE_URL` w `.env`.
+Przed publicznym użyciem zmień `AUTH_SECRET`, `ADMIN_PASSWORD` i `APP_BASE_URL` w `.env`.
+
+## Dostęp gości
+
+Sama znajomość domeny nie daje dostępu do zdjęć ani uploadu. Gość wpisuje kod na
+stronie głównej lub otwiera prywatny link `/u/<kod>` z QR. Oba kody w panelu admina
+są równorzędne: pozwalają wrzucać zdjęcia, kiedy admin otworzy wrzucanie, i oglądać
+wyłącznie opublikowane zdjęcia, kiedy admin otworzy galerię. Każde żądanie do API
+ponownie sprawdza kod i odpowiedni przełącznik, również dla wcześniej otwartych stron.
+
+Kody i QR są w zakładce „Kody QR” w panelu admina. Puste `UPLOAD_TOKEN` i
+`GALLERY_TOKEN` generują losowe kody przy pierwszym seedzie. Zmienne te służą tylko
+do początkowej konfiguracji; kolejne uruchomienia seeda zachowują aktualne kody.
+Kod można udostępnić do ręcznego wpisania albo jako link/QR.
+
+**Po aktualizacji wcześniejszej wersji wygeneruj nowe kody w panelu admina.** Stara
+strona główna ujawniała link dostępu. Przycisk „Wygeneruj nowe kody dostępu”
+unieważnia oba dotychczasowe kody i linki, więc trzeba też wymienić wydrukowane QR.
+Restart aplikacji nie przywraca unieważnionych kodów.
 
 ## Docker
 
@@ -130,3 +148,14 @@ Playwright uruchamia serwer na `localhost:3000` lub wykorzystuje już działają
 Testy tworzą własne zdjęcia, tymczasowo otwierają dodawanie i galerię,
 a na końcu usuwają swoje zdjęcia i przywracają poprzednie ustawienia.
 Zrzuty ekranów i pobrane próbki trafiają do ignorowanego `output/playwright/`.
+
+Testy dostępu wywołują rzeczywiste endpointy i renderują strony z osobną bazą
+PostgreSQL działającą w procesie testów (PGlite) oraz tymczasowym katalogiem zdjęć.
+Nie wymagają serwera i nie łączą się z bazą skonfigurowaną w `.env`.
+
+```bash
+npm run test:access
+```
+
+Testy sprawdzają brak publicznych tokenów, oba sposoby wejścia, wszystkie cztery
+kombinacje przełączników admina, blokady API, izolację zdjęć oraz unieważnianie kodów.

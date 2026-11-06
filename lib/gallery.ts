@@ -7,11 +7,7 @@ export type GalleryPage = {
   total: number;
 };
 
-export function findGuestEvent(token: string) {
-  return prisma.event.findFirst({
-    where: { OR: [{ uploadToken: token }, { galleryToken: token }] },
-  });
-}
+export { findGuestEvent } from "@/lib/guest-access";
 
 export async function getGalleryPage(
   eventId: string,

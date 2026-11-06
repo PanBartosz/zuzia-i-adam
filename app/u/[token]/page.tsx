@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import GuestExperience from "@/components/GuestExperience";
-import { toEventDto } from "@/lib/photo-dto";
+import { toGuestEventDto } from "@/lib/photo-dto";
 import { findGuestEvent, getGalleryPage } from "@/lib/gallery";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +21,10 @@ export default async function GuestPage({ params }: Props) {
 
   return (
     <GuestExperience
-      event={toEventDto(event)}
+      event={toGuestEventDto(event)}
       gallery={gallery}
       token={token}
+      initialView={token === event.galleryToken || (!event.uploadEnabled && event.galleryEnabled) ? "gallery" : "upload"}
     />
   );
 }

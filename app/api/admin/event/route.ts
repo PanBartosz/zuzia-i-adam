@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { jsonError, requireAdminRequest } from "@/lib/http";
 import { toEventDto } from "@/lib/photo-dto";
+import { randomBytes } from "node:crypto";
 
 export const runtime = "nodejs";
 
@@ -40,10 +41,20 @@ export async function PATCH(request: NextRequest) {
     typeof body?.uploadEnabled === "boolean" ? body.uploadEnabled : event.uploadEnabled;
   const galleryEnabled =
     typeof body?.galleryEnabled === "boolean" ? body.galleryEnabled : event.galleryEnabled;
+  const accessRotated = body?.rotateAccess === true;
 
   const updated = await prisma.event.update({
     where: { id: event.id },
-    data: { uploadEnabled, galleryEnabled },
+    data: {
+      uploadEnabled,
+      galleryEnabled,
+      ...(accessRotated
+        ? {
+            uploadToken: randomBytes(18).toString("base64url"),
+            galleryToken: randomBytes(18).toString("base64url"),
+          }
+        : {}),
+    },
   });
 
   await prisma.auditLog.create({
@@ -52,7 +63,7 @@ export async function PATCH(request: NextRequest) {
       action: "UPDATE_EVENT_SETTINGS",
       entity: "Event",
       entityId: event.id,
-      metadata: { uploadEnabled, galleryEnabled },
+      metadata: { uploadEnabled, galleryEnabled, accessRotated },
     },
   });
 

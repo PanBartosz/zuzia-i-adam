@@ -102,8 +102,8 @@ export default function AdminDashboard({
     );
   }, [photos]);
 
-  const uploadUrl = `${appBaseUrl.replace(/\/$/, "")}/u/${eventState.uploadToken}`;
-  const galleryUrl = `${appBaseUrl.replace(/\/$/, "")}/u/${eventState.galleryToken}`;
+  const uploadUrl = `${appBaseUrl.replace(/\/$/, "")}/u/${encodeURIComponent(eventState.uploadToken)}`;
+  const galleryUrl = `${appBaseUrl.replace(/\/$/, "")}/u/${encodeURIComponent(eventState.galleryToken)}`;
 
   async function refreshPhotos() {
     setRefreshing(true);
@@ -191,7 +191,7 @@ export default function AdminDashboard({
   }
 
   async function updateSettings(
-    next: Partial<Pick<EventDto, "uploadEnabled" | "galleryEnabled">>,
+    next: Partial<Pick<EventDto, "uploadEnabled" | "galleryEnabled">> & { rotateAccess?: boolean },
   ) {
     if (settingsBusy) return;
     setSettingsBusy(true);
@@ -210,11 +210,17 @@ export default function AdminDashboard({
 
       const body = (await response.json()) as { event: EventDto };
       setEventState(body.event);
+      if (next.rotateAccess) setNotice("Nowe kody są gotowe. Poprzednie kody, linki i QR zostały unieważnione.");
     } catch {
       setNotice("Nie udało się zapisać ustawień. Sprawdź połączenie.");
     } finally {
       setSettingsBusy(false);
     }
+  }
+
+  function rotateAccess() {
+    if (settingsBusy || !window.confirm("Wygenerować nowe kody dostępu? Dotychczasowe kody, linki i wydrukowane QR przestaną działać.")) return;
+    void updateSettings({ rotateAccess: true });
   }
 
   async function logout() {
@@ -463,17 +469,27 @@ export default function AdminDashboard({
                 Do druku
               </p>
               <h2 className="font-serif text-4xl">Kody QR</h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Każdy kod daje ten sam dostęp do albumu. Wrzucanie i oglądanie
+                zdjęć otwierasz osobno w ustawieniach. Kod można też wpisać na stronie głównej.
+              </p>
+              <button className="btn-secondary mt-4" onClick={rotateAccess} disabled={settingsBusy}>
+                <RefreshCw size={17} />
+                {settingsBusy ? "Zapisywanie..." : "Wygeneruj nowe kody dostępu"}
+              </button>
             </div>
             <div className="grid gap-4 lg:grid-cols-2">
               <QrCard
-                title="Dodawanie zdjęć"
+                title="Dostęp dla gości"
                 subtitle="Postaw na stolikach i przy parkiecie"
                 url={uploadUrl}
+                code={eventState.uploadToken}
               />
               <QrCard
-                title="Galeria po weselu"
+                title="Dodatkowy kod dostępu"
                 subtitle="Ten kod może trafić do wiadomości dla gości"
                 url={galleryUrl}
+                code={eventState.galleryToken}
               />
             </div>
           </section>
@@ -506,11 +522,11 @@ export default function AdminDashboard({
             </div>
 
             <div className="paper-surface rounded-[8px] border border-[var(--line)] p-5">
-              <h2 className="font-serif text-3xl">Adresy</h2>
+              <h2 className="font-serif text-3xl">Prywatne linki dostępu</h2>
               <dl className="mt-5 space-y-4 text-sm">
                 <div>
                   <dt className="font-semibold uppercase text-[#62775e]">
-                    Upload
+                    Dostęp dla gości
                   </dt>
                   <dd className="mt-1 break-all rounded-[8px] border border-[var(--line)] bg-white/70 p-3">
                     {uploadUrl}
@@ -518,7 +534,7 @@ export default function AdminDashboard({
                 </div>
                 <div>
                   <dt className="font-semibold uppercase text-[#62775e]">
-                    Galeria
+                    Dodatkowy dostęp dla gości
                   </dt>
                   <dd className="mt-1 break-all rounded-[8px] border border-[var(--line)] bg-white/70 p-3">
                     {galleryUrl}
@@ -781,10 +797,12 @@ function QrCard({
   title,
   subtitle,
   url,
+  code,
 }: {
   title: string;
   subtitle: string;
   url: string;
+  code: string;
 }) {
   const qrRef = useRef<SVGSVGElement>(null);
 
@@ -808,6 +826,10 @@ function QrCard({
         <div>
           <p className="font-serif text-3xl">{title}</p>
           <p className="mt-2 text-sm text-[var(--muted)]">{subtitle}</p>
+          <p className="mt-4 text-xs font-semibold uppercase text-[var(--olive)]">Kod do wpisania na stronie</p>
+          <p className="mt-1 break-all rounded-[8px] border border-[var(--line)] bg-white/70 p-3 font-mono text-sm">
+            {code}
+          </p>
           <p className="mt-4 break-all rounded-[8px] border border-[var(--line)] bg-white/70 p-3 text-sm">
             {url}
           </p>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Camera, Images, Heart } from "lucide-react";
-import type { EventDto } from "@/lib/photo-dto";
+import type { GuestEventDto } from "@/lib/photo-dto";
 import type { GalleryPage } from "@/lib/gallery";
 import { coupleName, weddingMessage } from "@/lib/wedding";
 import GuestUpload from "@/components/GuestUpload";
@@ -12,17 +12,14 @@ export default function GuestExperience({
   event,
   gallery,
   token,
+  initialView,
 }: {
-  event: EventDto;
+  event: GuestEventDto;
   gallery: GalleryPage;
   token: string;
+  initialView: "upload" | "gallery";
 }) {
-  const [view, setView] = useState<"upload" | "gallery">(
-    token === event.galleryToken ||
-      (!event.uploadEnabled && event.galleryEnabled)
-      ? "gallery"
-      : "upload",
-  );
+  const [view, setView] = useState<"upload" | "gallery">(initialView);
   const views = ["upload", "gallery"] as const;
 
   return (
@@ -89,7 +86,7 @@ export default function GuestExperience({
         aria-labelledby="tab-upload"
         hidden={view !== "upload"}
       >
-        <GuestUpload token={event.uploadToken} enabled={event.uploadEnabled} />
+        <GuestUpload token={token} enabled={event.uploadEnabled} />
       </div>
       <div
         id="panel-gallery"

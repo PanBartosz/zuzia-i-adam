@@ -107,6 +107,25 @@ test.afterAll(async () => {
   await database.end();
 });
 
+test("private access: home requires a code and both codes unlock the album", async ({ page }) => {
+  const home = await page.goto("/");
+  expect(page.url()).toBe(`${baseURL}/`);
+  const html = await home!.text();
+  expect(html).not.toContain(event.uploadToken);
+  expect(html).not.toContain(event.galleryToken);
+  await page.getByLabel("Kod lub hasło dostępu").fill("wrong-access-code");
+  await page.getByRole("button", { name: "Otwórz album" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Nieprawidłowy kod dostępu." })).toBeVisible();
+  for (const [code, other] of [[event.uploadToken, event.galleryToken], [event.galleryToken, event.uploadToken]]) {
+    await page.goto("/");
+    await page.getByLabel("Kod lub hasło dostępu").fill(code);
+    await page.getByRole("button", { name: "Otwórz album" }).click();
+    await page.waitForURL(`${baseURL}/u/${encodeURIComponent(code)}`);
+    await expect(page.getByRole("heading", { name: "Zuzanna & Adam" })).toBeVisible();
+    expect(await page.content()).not.toContain(other);
+  }
+});
+
 test("upload: duplicate selection, removal, retry and clear success", async ({
   page,
 }) => {

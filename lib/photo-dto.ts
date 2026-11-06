@@ -32,14 +32,17 @@ export type PhotoDto = {
   updatedAt: string;
 };
 
-export type EventDto = {
-  id: string;
+export type GuestEventDto = {
   coupleName: string;
   weddingDate: string | null;
-  uploadToken: string;
-  galleryToken: string;
   uploadEnabled: boolean;
   galleryEnabled: boolean;
+};
+
+export type EventDto = GuestEventDto & {
+  id: string;
+  uploadToken: string;
+  galleryToken: string;
 };
 
 export function toPhotoDto(photo: Photo): PhotoDto {
@@ -61,11 +64,17 @@ export function toPhotoDto(photo: Photo): PhotoDto {
 
 export function toEventDto(event: Event): EventDto {
   return {
+    ...toGuestEventDto(event),
     id: event.id,
-    coupleName: event.coupleName,
-    weddingDate: event.weddingDate?.toISOString() ?? null,
     uploadToken: event.uploadToken,
     galleryToken: event.galleryToken,
+  };
+}
+
+export function toGuestEventDto(event: Event): GuestEventDto {
+  return {
+    coupleName: event.coupleName,
+    weddingDate: event.weddingDate?.toISOString() ?? null,
     uploadEnabled: event.uploadEnabled,
     galleryEnabled: event.galleryEnabled,
   };

@@ -12,6 +12,7 @@ import {
   writeStorageFile,
 } from "@/lib/storage";
 import { toPhotoDto } from "@/lib/photo-dto";
+import { findGuestEvent } from "@/lib/guest-access";
 
 export const runtime = "nodejs";
 
@@ -21,9 +22,7 @@ type Params = {
 
 export async function POST(request: NextRequest, { params }: Params) {
   const { token } = await params;
-  const event = await prisma.event.findUnique({
-    where: { uploadToken: token },
-  });
+  const event = await findGuestEvent(token);
 
   if (!event || !event.uploadEnabled) {
     return jsonError("Wrzucanie zdjęć jest teraz zamknięte.", 403);
